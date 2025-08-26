@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: argocd-apps
+  namespace: argocd
+spec:
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/syncPolicy
+  goTemplate: true
+  #goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/jackydalong/charts-argo-apps.git
+        revision: main
+        files:
+          - path: "**/values.yaml"
+        values:
+          argoDefaultApplication: "{{`{{ .path.basenameNormalized }}`}}-{{`{{ index .path.segments 0 }}`}}"
+          argoDefaultProject: "{{`{{ index .path.segments 0 }}`}}"
+          argoDefaultNamespace: "{{`{{ .path.basenameNormalized }}`}}"
+  template:
+    metadata:
+      name: "{{`{{ default .values.argoDefaultApplication .argoApplication }}`}}"
+      namespace: argo-cd
+    spec:
+      project: "{{`{{ default .values.argoDefaultProject .argoProject }}`}}"
+      source:
+        repoURL: https://github.com/jackydalong/charts-argo-apps.git
+        targetRevision: main
+        path: "{{`{{ .path.path }}`}}"
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        namespace: "{{`{{ default .values.argoDefaultNamespace .argoNamespace }}`}}"
+        name: "{{`{{ .values.argoDefaultProject }}`}}"
+      syncPolicy:
+        automated:
+          # prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+      ignoreDifferences:
+        - group: ""
+          kind: Secret
+          jsonPointers:
+            - /data
+            - /stringData
+        - kind: ValidatingWebhookConfiguration
+          group: admissionregistration.k8s.io
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+
+  templatePatch: |
+    {{`{{- if .argoApplicationAnnotations }}`}}
+    metadata:
+      annotations:
+        {{`{{- toYaml .argoApplicationAnnotations | nindent 8 }}`}}
+    {{`{{- end }}`}}
+    {{`{{- if .argoNamespaceMetadata }}`}}
+    spec:
+      syncPolicy:
+        managedNamespaceMetadata:
+          {{`{{- if .argoNamespaceMetadata.labels }}`}}
+          labels:
+            {{`{{- range $key, $value := .argoNamespaceMetadata.labels }}`}}
+            {{`{{ $key }}`}}: "{{`{{ $value }}`}}"
+            {{`{{- end }}`}}
+          {{`{{- end }}`}}
+          {{`{{- if .argoNamespaceMetadata.annotations }}`}}
+          annotations:
+            {{`{{- range $key, $value := .argoNamespaceMetadata.annotations }}`}}
+            {{`{{ $key }}`}}: "{{`{{ $value }}`}}"
+            {{`{{- end }}`}}
+          {{`{{- end }}`}}
+    {{`{{- end }}`}}
