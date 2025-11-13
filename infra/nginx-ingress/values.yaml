@@ -1,0 +1,16 @@
+nginx:
+  enableCertManager: true
+  controller:
+    replicaCount: 2
+    service:
+      type: NodePort
+    ingressClassResource:
+      name: nginx-ic
+      enabled: true
+      default: true
+    metrics:
+      enabled: true
+    # enable cert-manager to manage cert
+    admissionWebhooks:
+      certManager:
+        enabled: true
