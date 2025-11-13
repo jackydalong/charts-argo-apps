@@ -1,0 +1,273 @@
+# vault/templates/vault-cluster.yaml
+apiVersion: "vault.banzaicloud.com/v1alpha1"
+kind: "Vault"
+metadata:
+  name: vault-cn
+spec:
+  size: 3
+  image: hashicorp/vault:1.18
+  bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
+  serviceAccount: vault-infra
+
+  podAntiAffinity: topology.kubernetes.io/zone
+  serviceType: ClusterIP
+
+  resources:
+    vault:
+      requests:
+        cpu: 25m
+        memory: 200Mi
+      limits:
+        memory: 200Mi
+        cpu: 50m
+
+  secretInitsConfig:
+    - name: SKIP_CHOWN
+      value: "true"
+
+  vaultInitContainers:
+    - name: config-permission
+      image: docker.io/library/busybox:latest
+      command:
+        - /bin/sh
+        - -c
+        - "chmod g+r,o+r /vault/config/vault.json"
+      volumeMounts:
+        - mountPath: /vault/config
+          name: vault-config
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+
+  volumeClaimTemplates:
+    - metadata:
+        name: vault-raft
+      spec:
+        storageClassName: nfs-client 
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 200Mi
+
+  volumes:
+    - name: vault-audit-logs
+      persistentVolumeClaim:
+        claimName: vault-audit-logs
+
+  volumeMounts:
+    - name: vault-raft
+      mountPath: /vault/file
+    - name: vault-audit-logs
+      mountPath: /vault/audit
+
+  unsealConfig:
+    kubernetes:
+      secretNamespace: vault
+
+  caNamespaces: ["*"]
+
+  config:
+    cluster_name: cn-vault
+    ui: true
+    storage:
+      raft:
+        path: /vault/file
+    seal:
+      shamir:
+        secret_shares: 1
+        secret_threshold: 1
+    listener:
+      tcp:
+        address: "[::]:8200"
+        cluster_address: "[::]:8201"
+
+        tls_cert_file: /vault/tls/server.crt
+        tls_key_file: /vault/tls/server.key
+
+        telemetry:
+          unauthenticated_metrics_access: true
+    telemetry:
+      disable_hostname: true
+      prometheus_retention_time: "24h"
+
+    api_addr: https://vault-cn.vault:8200
+    cluster_addr: "https://${.Env.POD_NAME}:8201"
+
+    log_format: json
+
+
+  serviceRegistrationEnabled: true
+  serviceMonitorEnabled: true
+  statsdDisabled: true
+
+  externalConfig:
+    purgeUnmanagedConfig:
+      enabled: true
+      exclude:
+        secrets: true
+        auth: true
+    audit:
+      - type: file
+        options:
+          file_path: stdout
+          hmac_accessor: "false"
+          log_raw: "true"
+    policies:
+      - name: admin
+        rules: |
+          # Allow managing leases
+          path "sys/leases/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # Manage auth methods broadly across Vault
+          path "auth/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # Create, update, and delete auth methods
+          path "sys/auth/*"
+          {
+            capabilities = ["create", "update", "delete", "sudo"]
+          }
+
+          # List auth methods
+          path "sys/auth"
+          {
+            capabilities = ["read"]
+          }
+
+          # List existing policies
+          path "sys/policies/acl"
+          {
+            capabilities = ["read","list"]
+          }
+
+          # Create and manage ACL policies
+          path "sys/policies/acl/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # List, create, update, and delete key/value secrets
+          path "secret/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # Manage secret engines
+          path "sys/mounts/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # List existing secret engines.
+          path "sys/mounts"
+          {
+            capabilities = ["read"]
+          }
+
+          # Read health checks
+          path "sys/health"
+          {
+            capabilities = ["read", "sudo"]
+          }
+      - name: power_user
+        rules: |
+          # List all secrets
+          path "secret/*"
+          {
+            capabilities = ["list"]
+          }
+
+          # CRUDL secrets in staging
+          path "secret/data/kubernetes/staging/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list"]
+          }
+          path "secret/metadata/kubernetes/staging/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list"]
+          }
+
+          # CRUDL secrets in production
+          path "secret/data/kubernetes/prod/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list"]
+          }
+          path "secret/metadata/kubernetes/prod/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list"]
+          }
+
+          # List secret engines
+          path "sys/mounts/*"
+          {
+            capabilities = ["read", "list"]
+          }
+
+          # List existing secret engines.
+          path "sys/mounts"
+          {
+            capabilities = ["read"]
+          }
+
+          # Read health checks
+          path "sys/health"
+          {
+            capabilities = ["read"]
+          }
+
+          # Manage OIDC Provider settings
+          path "/identity/oidc/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # Read and write Raft status and snapshots
+          path "/sys/storage/raft/*"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+          # Use built-in swagger UI
+          path "/sys/internal/specs/openapi"
+          {
+            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+          }
+
+      - name: readonly_secrets
+        rules: |
+          path "secret/*" {
+            capabilities = ["read", "list"]
+          }
+
+      - name: kube_mgmt_namespaced
+        rules: |
+          path "secret/data/kubernetes/mgmt/{{ printf "{{identity.entity.aliases.auth_kubernetes_958ce766.metadata.service_account_namespace}}" }}/*" {
+            capabilities = ["read", "list"]
+          }
+
+    auth:
+      
+      - type: kubernetes
+        roles:
+          - name: default
+            bound_service_account_names: ["*"]
+            bound_service_account_namespaces: ["*"]
+            policies: kube_mgmt_namespaced
+            ttl: 1h
+            
+
+    secrets:
+      - type: kv
+        path: secret
+        options:
+          version: 2
+        configuration:
+          config:
+            - max_versions: 3
