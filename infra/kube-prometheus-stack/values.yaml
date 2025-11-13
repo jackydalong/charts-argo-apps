@@ -142,8 +142,24 @@ kps:
 
   grafana:
     enabled: true
- 
+    # --- Grafana Custom Memory Configuration ---
+    resources:
+      requests:
+        cpu: 50m
+        memory: 100Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+
   alertmanager:
+    # --- Alertmanager Custom Memory Configuration ---
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
     alertmanagerSpec:
       replicas: 1
       logFormat: json
@@ -157,6 +173,14 @@ kps:
                 storage: 500Mi
 
   prometheus:
+    # --- Prometheus Custom Memory Configuration ---
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
     prometheusSpec:
       replicas: 1
       storageSpec:
