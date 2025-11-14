@@ -6,8 +6,11 @@ spec:
   # 1. Single node size
   size: 1
   image: hashicorp/vault:1.18
+
   #bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
+  # Setting this to empty string AND removing unsealConfig will stop the sidecar
   bankVaultsImage: ""
+
   serviceAccount: vault-infra
 
   # 2. Clear out HA-related fields
@@ -58,9 +61,10 @@ spec:
     - name: vault-file
       mountPath: /vault/file
 
-  unsealConfig:
-    kubernetes:
-      secretNamespace: vault
+
+  # unsealConfig:
+  #   kubernetes:
+  #     secretNamespace: vault
 
   caNamespaces: ["*"]
 
@@ -72,6 +76,7 @@ spec:
       file:
         path: /vault/file
     seal:
+      # Set shares/threshold to 1/1 for easiest manual unsealing
       shamir:
         secret_shares: 1
         secret_threshold: 1
