@@ -7,6 +7,7 @@ spec:
   size: 1
   image: hashicorp/vault:1.18
   #bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
+  bankVaultsImage: ""
   serviceAccount: vault-infra
 
   # 2. Clear out HA-related fields
