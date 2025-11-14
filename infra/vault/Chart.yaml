@@ -1,4 +1,3 @@
-# vault/Chart.yaml
 apiVersion: v2
 type: application
 name: vault

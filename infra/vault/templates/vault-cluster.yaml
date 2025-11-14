@@ -4,7 +4,7 @@ kind: "Vault"
 metadata:
   name: vault-cn
 spec:
-  size: 3
+  size: 1
   image: hashicorp/vault:1.18
   bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
   serviceAccount: vault-infra
@@ -72,7 +72,8 @@ spec:
     cluster_name: cn-vault
     ui: true
     storage:
-      raft:
+      # MODIFIED: Changed storage from 'raft' to 'file'
+      file:
         path: /vault/file
     seal:
       shamir:
