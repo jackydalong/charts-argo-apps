@@ -3,13 +3,13 @@ kind: "Vault"
 metadata:
   name: vault-cn
 spec:
-  # 1. Set size to 1 for non-HA single node
+  # 1. Single node size
   size: 1
   image: hashicorp/vault:1.18
   bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
   serviceAccount: vault-infra
 
-  # 2. Remove Pod Anti-Affinity (not relevant for size: 1)
+  # 2. Clear out HA-related fields
   podAntiAffinity: "" 
   serviceType: ClusterIP
 
@@ -41,18 +41,21 @@ spec:
           cpu: 25m
           memory: 64Mi
 
-  # 3. Removed volumeClaimTemplates for file backend, relying on default EmptyDir for /vault/file
-
   volumes:
     # Retain the audit logs PVC
     - name: vault-audit-logs
       persistentVolumeClaim:
         claimName: vault-audit-logs
-  
+    # Explicit EmptyDir for file storage (temporary, non-persistent)
+    - name: vault-file
+      emptyDir: {}
+
   volumeMounts:
-    # The 'vault-raft' PVC mount is gone, replaced by a simple EmptyDir for file storage (default behavior)
     - name: vault-audit-logs
       mountPath: /vault/audit
+    # Mount for file storage backend
+    - name: vault-file
+      mountPath: /vault/file
 
   unsealConfig:
     kubernetes:
@@ -64,7 +67,7 @@ spec:
     cluster_name: cn-vault
     ui: true
     storage:
-      # 4. Use file storage backend
+      # Use file storage backend
       file:
         path: /vault/file
     seal:
@@ -74,9 +77,8 @@ spec:
     listener:
       tcp:
         address: "[::]:8200"
-        # 5. Remove HA/Cluster address entirely for single node
-        # cluster_address: "[::]:8201" 
-
+        # cluster_address is omitted here as it's not needed for file storage
+        
         tls_cert_file: /vault/tls/server.crt
         tls_key_file: /vault/tls/server.key
 
@@ -87,12 +89,11 @@ spec:
       prometheus_retention_time: "24h"
 
     api_addr: https://vault-cn.vault:8200
-    # 6. Remove HA cluster address reference
-    # cluster_addr: "https://${.Env.POD_NAME}:8201"
-
+    # cluster_addr is omitted
     log_format: json
 
-  serviceRegistrationEnabled: true
+  # CRITICAL CHANGE: Disables cluster-aware internal service management/orchestration.
+  serviceRegistrationEnabled: false 
   serviceMonitorEnabled: true
   statsdDisabled: true
 
@@ -108,7 +109,6 @@ spec:
           file_path: stdout
           hmac_accessor: "false"
           log_raw: "true"
-    # Policies and Auth configuration remain the same
     policies:
       - name: admin
         rules: |
