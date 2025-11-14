@@ -97,96 +97,96 @@ spec:
   serviceMonitorEnabled: true
   statsdDisabled: true
 
-  externalConfig:
-    purgeUnmanagedConfig:
-      enabled: true
-      exclude:
-        secrets: true
-        auth: true
-    audit:
-      - type: file
-        options:
-          file_path: stdout
-          hmac_accessor: "false"
-          log_raw: "true"
-    policies:
-      - name: admin
-        rules: |
-          path "sys/leases/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
+  # externalConfig:
+  #   purgeUnmanagedConfig:
+  #     enabled: true
+  #     exclude:
+  #       secrets: true
+  #       auth: true
+  #   audit:
+  #     - type: file
+  #       options:
+  #         file_path: stdout
+  #         hmac_accessor: "false"
+  #         log_raw: "true"
+  #   policies:
+  #     - name: admin
+  #       rules: |
+  #         path "sys/leases/*"
+  #         {
+  #           capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+  #         }
 
-          path "auth/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
+  #         path "auth/*"
+  #         {
+  #           capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+  #         }
 
-          path "sys/auth/*"
-          {
-            capabilities = ["create", "update", "delete", "sudo"]
-          }
+  #         path "sys/auth/*"
+  #         {
+  #           capabilities = ["create", "update", "delete", "sudo"]
+  #         }
 
-          path "sys/auth"
-          {
-            capabilities = ["read"]
-          }
+  #         path "sys/auth"
+  #         {
+  #           capabilities = ["read"]
+  #         }
 
-          path "sys/policies/acl"
-          {
-            capabilities = ["read","list"]
-          }
+  #         path "sys/policies/acl"
+  #         {
+  #           capabilities = ["read","list"]
+  #         }
 
-          path "sys/policies/acl/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
+  #         path "sys/policies/acl/*"
+  #         {
+  #           capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+  #         }
 
-          path "secret/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
+  #         path "secret/*"
+  #         {
+  #           capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+  #         }
 
-          path "sys/mounts/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
+  #         path "sys/mounts/*"
+  #         {
+  #           capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+  #         }
 
-          path "sys/mounts"
-          {
-            capabilities = ["read"]
-          }
+  #         path "sys/mounts"
+  #         {
+  #           capabilities = ["read"]
+  #         }
 
-          path "sys/health"
-          {
-            capabilities = ["read", "sudo"]
-          }
-      - name: readonly_secrets
-        rules: |
-          path "secret/*" {
-            capabilities = ["read", "list"]
-          }
+  #         path "sys/health"
+  #         {
+  #           capabilities = ["read", "sudo"]
+  #         }
+  #     - name: readonly_secrets
+  #       rules: |
+  #         path "secret/*" {
+  #           capabilities = ["read", "list"]
+  #         }
 
-      - name: kube_mgmt_namespaced
-        rules: |
-          path "secret/data/kubernetes/mgmt/{{ printf "{{identity.entity.aliases.auth_kubernetes_958ce766.metadata.service_account_namespace}}" }}/*" {
-            capabilities = ["read", "list"]
-          }
+  #     - name: kube_mgmt_namespaced
+  #       rules: |
+  #         path "secret/data/kubernetes/mgmt/{{ printf "{{identity.entity.aliases.auth_kubernetes_958ce766.metadata.service_account_namespace}}" }}/*" {
+  #           capabilities = ["read", "list"]
+  #         }
 
-    auth:
-      - type: kubernetes
-        roles:
-          - name: default
-            bound_service_account_names: ["*"]
-            bound_service_account_namespaces: ["*"]
-            policies: kube_mgmt_namespaced
-            ttl: 1h
+  #   auth:
+  #     - type: kubernetes
+  #       roles:
+  #         - name: default
+  #           bound_service_account_names: ["*"]
+  #           bound_service_account_namespaces: ["*"]
+  #           policies: kube_mgmt_namespaced
+  #           ttl: 1h
 
-    secrets:
-      - type: kv
-        path: secret
-        options:
-          version: 2
-        configuration:
-          config:
-            - max_versions: 3
+  #   secrets:
+  #     - type: kv
+  #       path: secret
+  #       options:
+  #         version: 2
+  #       configuration:
+  #         config:
+  #           - max_versions: 3
