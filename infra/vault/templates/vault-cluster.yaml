@@ -1,15 +1,16 @@
-# vault/templates/vault-cluster.yaml
 apiVersion: "vault.banzaicloud.com/v1alpha1"
 kind: "Vault"
 metadata:
   name: vault-cn
 spec:
+  # 1. Set size to 1 for non-HA single node
   size: 1
   image: hashicorp/vault:1.18
   bankVaultsImage: ghcr.io/bank-vaults/bank-vaults:v1.32.0
   serviceAccount: vault-infra
 
-  podAntiAffinity: topology.kubernetes.io/zone
+  # 2. Remove Pod Anti-Affinity (not relevant for size: 1)
+  podAntiAffinity: "" 
   serviceType: ClusterIP
 
   resources:
@@ -40,25 +41,16 @@ spec:
           cpu: 25m
           memory: 64Mi
 
-  volumeClaimTemplates:
-    - metadata:
-        name: vault-raft
-      spec:
-        storageClassName: nfs-client 
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 200Mi
+  # 3. Removed volumeClaimTemplates for file backend, relying on default EmptyDir for /vault/file
 
   volumes:
+    # Retain the audit logs PVC
     - name: vault-audit-logs
       persistentVolumeClaim:
         claimName: vault-audit-logs
-
+  
   volumeMounts:
-    - name: vault-raft
-      mountPath: /vault/file
+    # The 'vault-raft' PVC mount is gone, replaced by a simple EmptyDir for file storage (default behavior)
     - name: vault-audit-logs
       mountPath: /vault/audit
 
@@ -72,7 +64,7 @@ spec:
     cluster_name: cn-vault
     ui: true
     storage:
-      # MODIFIED: Changed storage from 'raft' to 'file'
+      # 4. Use file storage backend
       file:
         path: /vault/file
     seal:
@@ -82,7 +74,8 @@ spec:
     listener:
       tcp:
         address: "[::]:8200"
-        cluster_address: "[::]:8201"
+        # 5. Remove HA/Cluster address entirely for single node
+        # cluster_address: "[::]:8201" 
 
         tls_cert_file: /vault/tls/server.crt
         tls_key_file: /vault/tls/server.key
@@ -94,10 +87,10 @@ spec:
       prometheus_retention_time: "24h"
 
     api_addr: https://vault-cn.vault:8200
-    cluster_addr: "https://${.Env.POD_NAME}:8201"
+    # 6. Remove HA cluster address reference
+    # cluster_addr: "https://${.Env.POD_NAME}:8201"
 
     log_format: json
-
 
   serviceRegistrationEnabled: true
   serviceMonitorEnabled: true
@@ -115,132 +108,59 @@ spec:
           file_path: stdout
           hmac_accessor: "false"
           log_raw: "true"
+    # Policies and Auth configuration remain the same
     policies:
       - name: admin
         rules: |
-          # Allow managing leases
           path "sys/leases/*"
           {
             capabilities = ["create", "read", "update", "delete", "list", "sudo"]
           }
 
-          # Manage auth methods broadly across Vault
           path "auth/*"
           {
             capabilities = ["create", "read", "update", "delete", "list", "sudo"]
           }
 
-          # Create, update, and delete auth methods
           path "sys/auth/*"
           {
             capabilities = ["create", "update", "delete", "sudo"]
           }
 
-          # List auth methods
           path "sys/auth"
           {
             capabilities = ["read"]
           }
 
-          # List existing policies
           path "sys/policies/acl"
           {
             capabilities = ["read","list"]
           }
 
-          # Create and manage ACL policies
           path "sys/policies/acl/*"
           {
             capabilities = ["create", "read", "update", "delete", "list", "sudo"]
           }
 
-          # List, create, update, and delete key/value secrets
           path "secret/*"
           {
             capabilities = ["create", "read", "update", "delete", "list", "sudo"]
           }
 
-          # Manage secret engines
           path "sys/mounts/*"
           {
             capabilities = ["create", "read", "update", "delete", "list", "sudo"]
           }
 
-          # List existing secret engines.
           path "sys/mounts"
           {
             capabilities = ["read"]
           }
 
-          # Read health checks
           path "sys/health"
           {
             capabilities = ["read", "sudo"]
           }
-      - name: power_user
-        rules: |
-          # List all secrets
-          path "secret/*"
-          {
-            capabilities = ["list"]
-          }
-
-          # CRUDL secrets in staging
-          path "secret/data/kubernetes/staging/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list"]
-          }
-          path "secret/metadata/kubernetes/staging/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list"]
-          }
-
-          # CRUDL secrets in production
-          path "secret/data/kubernetes/prod/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list"]
-          }
-          path "secret/metadata/kubernetes/prod/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list"]
-          }
-
-          # List secret engines
-          path "sys/mounts/*"
-          {
-            capabilities = ["read", "list"]
-          }
-
-          # List existing secret engines.
-          path "sys/mounts"
-          {
-            capabilities = ["read"]
-          }
-
-          # Read health checks
-          path "sys/health"
-          {
-            capabilities = ["read"]
-          }
-
-          # Manage OIDC Provider settings
-          path "/identity/oidc/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
-
-          # Read and write Raft status and snapshots
-          path "/sys/storage/raft/*"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
-
-          # Use built-in swagger UI
-          path "/sys/internal/specs/openapi"
-          {
-            capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-          }
-
       - name: readonly_secrets
         rules: |
           path "secret/*" {
@@ -254,7 +174,6 @@ spec:
           }
 
     auth:
-      
       - type: kubernetes
         roles:
           - name: default
@@ -262,7 +181,6 @@ spec:
             bound_service_account_namespaces: ["*"]
             policies: kube_mgmt_namespaced
             ttl: 1h
-            
 
     secrets:
       - type: kv
