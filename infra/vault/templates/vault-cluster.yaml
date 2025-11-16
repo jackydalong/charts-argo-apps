@@ -38,20 +38,20 @@ spec:
     - name: SKIP_CHOWN
       value: "true"
 
-  vaultInitContainers:
-    - name: config-permission
-      image: docker.io/library/busybox:latest
-      command:
-        - /bin/sh
-        - -c
-        - "chmod g+r,o+r /vault/config/vault.json"
-      volumeMounts:
-        - mountPath: /vault/config
-          name: vault-config
-      resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
+  # vaultInitContainers:
+  #   - name: config-permission
+  #     image: docker.io/library/busybox:latest
+  #     command:
+  #       - /bin/sh
+  #       - -c
+  #       - "chmod g+r,o+r /vault/config/vault.json"
+  #     volumeMounts:
+  #       - mountPath: /vault/config
+  #         name: vault-config
+  #     resources:
+  #       requests:
+  #         cpu: 25m
+  #         memory: 64Mi
 
   volumes:
     # Retain the audit logs PVC
