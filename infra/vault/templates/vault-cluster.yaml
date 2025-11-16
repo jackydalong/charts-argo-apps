@@ -2,6 +2,14 @@ apiVersion: "vault.banzaicloud.com/v1alpha1"
 kind: "Vault"
 metadata:
   name: vault-cn
+  annotations:
+    # 1. Annotation to disable the auto-unseal sidecar injection:
+    vault.banzaicloud.io/unseal-injection: "false"
+    # 2. Annotation to disable config templating logic (configurer pod logic):
+    vault.banzaicloud.io/vault-config-injection: "false"
+    # Keeping the Argocd annotation for context, though not relevant for this fix
+    argocd.argoproj.io/tracking-id: vault-infra:vault.banzaicloud.com/Vault:vault/vault-cn
+spec:
 spec:
   # 1. Single node size
   size: 1
